@@ -151,12 +151,16 @@ Singleton {
         "hl.config({ " +
         "general = { gaps_out = { top = 12, right = 22, bottom = 22, left = 22 }, " +
         "col = { active_border = 'rgb(94e2d5)' } }, " +
-        "decoration = { rounding = 12, glow = { enabled = false } } })"
+        "decoration = { rounding = 12, glow = { enabled = false } } }); " +
+        "hl.animation({ leaf = 'borderangle', enabled = false }); " +
+        "hl.animation({ leaf = 'glowangle', enabled = false })"
     readonly property string hyprRestore:
         "hl.config({ " +
         "general = { gaps_out = 10, " +
         "col = { active_border = { colors = { 'rgb(89dceb)', 'rgb(94e2d5)' }, angle = 45 } } }, " +
-        "decoration = { rounding = 10, glow = { enabled = true } } })"
+        "decoration = { rounding = 10, glow = { enabled = true } } }); " +
+        "hl.animation({ leaf = 'borderangle', enabled = true, speed = 60, bezier = 'linear', style = 'loop' }); " +
+        "hl.animation({ leaf = 'glowangle', enabled = true, speed = 60, bezier = 'linear', style = 'loop' })"
 
     Process {
         id: hyprProc
