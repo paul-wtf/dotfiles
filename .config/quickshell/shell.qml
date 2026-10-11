@@ -1,5 +1,6 @@
 //@ pragma UseQApplication
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Services.Notifications
 import Quickshell.Io
 import QtQuick
@@ -10,6 +11,11 @@ ShellRoot {
     property bool sidePanelOpen:  false
     property bool statsOpen:      false
     property bool musicOpen:      false
+
+    // Hidden layers still commit, and every commit makes Hyprland present an
+    // extra frame, which breaks VRR under a fullscreen game.
+    readonly property bool mainFullscreen:
+        Hyprland.monitorFor(mainBar.screen)?.activeWorkspace?.hasFullscreen ?? false
 
     // ── Notifications ───────────────────────────────────────────────────────────
     // Einziger Server (besitzt org.freedesktop.Notifications). Eingehende
@@ -36,12 +42,13 @@ ShellRoot {
 
     Bar {
         id: mainBar
+        visible: !root.mainFullscreen
         onPanelToggled: root.sidePanelOpen = !root.sidePanelOpen
         onStatsToggled: root.statsOpen     = !root.statsOpen
         onMusicToggled: root.musicOpen     = !root.musicOpen
     }
 
-    Frame { }
+    Frame { visible: Theme.zen && !root.mainFullscreen }
 
     SidePanel {
         panelOpen: root.sidePanelOpen
@@ -55,6 +62,7 @@ ShellRoot {
     }
 
     StatsOverlay {
+        visible:        !root.mainFullscreen
         statsOpen:      root.statsOpen
         panelWidth:     mainBar.centerIslandWidth
 
@@ -79,6 +87,7 @@ ShellRoot {
     }
 
     MusicOverlay {
+        visible:       !root.mainFullscreen
         musicOpen:     root.musicOpen
         islandX:       mainBar.musicIslandX
         islandWidth:   mainBar.musicIslandWidth
