@@ -125,7 +125,7 @@ PanelWindow {
     readonly property real claudeIslandX:     claudeIsland.x
     readonly property real claudeIslandWidth: claudeIsland.width
     property var  claudeLimits:    []
-    property var  claudeTokens:    null
+    property var  claudeStats:     null
     property int  claudeFetchedAt: 0
     property bool claudeStale:     false
 
@@ -147,11 +147,11 @@ PanelWindow {
     readonly property string claudeScript:
         Qt.resolvedUrl("scripts/claude-usage.py").toString().replace("file://", "")
     Process {
-        id: claudeTokensProc
-        command: ["python3", bar.claudeScript, "tokens"]
+        id: claudeStatsProc
+        command: ["python3", bar.claudeScript, "stats"]
         running: true
         stdout: SplitParser { splitMarker: "\n"; onRead: d => {
-            try { bar.claudeTokens = JSON.parse(d).tokens } catch (e) {} } }
+            try { bar.claudeStats = JSON.parse(d) } catch (e) {} } }
     }
     Process {
         id: claudeLimitsProc
@@ -165,8 +165,8 @@ PanelWindow {
             } catch (e) {} } }
     }
     Timer {
-        interval: 60000; running: true; repeat: true
-        onTriggered: if (!claudeTokensProc.running) claudeTokensProc.running = true
+        interval: 120000; running: true; repeat: true
+        onTriggered: if (!claudeStatsProc.running) claudeStatsProc.running = true
     }
     // The usage endpoint is rate-limited.
     Timer {

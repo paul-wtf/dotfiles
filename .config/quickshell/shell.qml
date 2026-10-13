@@ -104,7 +104,7 @@ ShellRoot {
         islandX:     mainBar.claudeIslandX
         islandWidth: mainBar.claudeIslandWidth
         limits:      mainBar.claudeLimits
-        tokens:      mainBar.claudeTokens
+        stats:       mainBar.claudeStats
         fetchedAt:   mainBar.claudeFetchedAt
         stale:       mainBar.claudeStale
     }
