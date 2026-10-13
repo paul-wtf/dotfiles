@@ -1,5 +1,6 @@
 import Quickshell
 import Quickshell.Services.Mpris
+import Quickshell.Wayland
 import QtQuick
 import QtQuick.Layouts
 
@@ -35,6 +36,9 @@ PanelWindow {
     margins { top: Theme.overlayTop; left: 12; right: 12 }
     exclusiveZone: -1
     color: "transparent"
+    // The click-outside catcher maps on open, so on the same layer it would
+    // stack above this window and swallow clicks on the controls.
+    WlrLayershell.layer: WlrLayer.Overlay
     implicitHeight: musicOpen ? 175 : 4
     Behavior on implicitHeight { NumberAnimation { duration: 280; easing.type: Easing.InOutCubic } }
 
