@@ -119,6 +119,60 @@ PanelWindow {
     signal musicToggled()
     readonly property real musicIslandX:     musicIsland.x
     readonly property real musicIslandWidth: musicIsland.width
+
+    // ── Claude usage ─────────────────────────────────────────────────────────
+    signal claudeToggled()
+    readonly property real claudeIslandX:     claudeIsland.x
+    readonly property real claudeIslandWidth: claudeIsland.width
+    property var  claudeLimits:    []
+    property var  claudeTokens:    null
+    property int  claudeFetchedAt: 0
+    property bool claudeStale:     false
+
+    function claudePercent(label) {
+        for (var i = 0; i < claudeLimits.length; i++)
+            if (claudeLimits[i].label === label) return Math.round(claudeLimits[i].percent) + "%"
+        return "–"
+    }
+    readonly property color claudeColor: {
+        var c = Theme.clrText
+        for (var i = 0; i < claudeLimits.length; i++) {
+            var s = claudeLimits[i].severity
+            if (s === "warning") c = Theme.clrYellow
+            else if (s !== "normal") return Theme.clrRed
+        }
+        return c
+    }
+
+    readonly property string claudeScript:
+        Qt.resolvedUrl("scripts/claude-usage.py").toString().replace("file://", "")
+    Process {
+        id: claudeTokensProc
+        command: ["python3", bar.claudeScript, "tokens"]
+        running: true
+        stdout: SplitParser { splitMarker: "\n"; onRead: d => {
+            try { bar.claudeTokens = JSON.parse(d).tokens } catch (e) {} } }
+    }
+    Process {
+        id: claudeLimitsProc
+        command: ["python3", bar.claudeScript, "limits"]
+        running: true
+        stdout: SplitParser { splitMarker: "\n"; onRead: d => {
+            try {
+                var r = JSON.parse(d)
+                bar.claudeStale = !r.ok
+                if (r.ok) { bar.claudeLimits = r.limits; bar.claudeFetchedAt = r.fetched_at }
+            } catch (e) {} } }
+    }
+    Timer {
+        interval: 60000; running: true; repeat: true
+        onTriggered: if (!claudeTokensProc.running) claudeTokensProc.running = true
+    }
+    // The usage endpoint is rate-limited.
+    Timer {
+        interval: 300000; running: true; repeat: true
+        onTriggered: if (!claudeLimitsProc.running) claudeLimitsProc.running = true
+    }
     property var  cpuHistory:      []
     property var  gpuHistory:      []
     property var  ramHistory:      []
@@ -778,6 +832,39 @@ PanelWindow {
                         }
                     }
                 }
+            }
+        }
+
+        // ── Claude island: plan limits ───────────────────────────────────────
+        Rectangle {
+            id: claudeIsland
+            anchors {
+                right: musicIsland.visible ? musicIsland.left : rightIsland.left
+                rightMargin: 8; top: parent.top; topMargin: 2
+            }
+            height:  40
+            radius:  Theme.radius
+            color:   Theme.islandBg
+            border   { color: Theme.borderColor(0.55); width: Theme.islandBorderWidth }
+            visible: bar.claudeLimits.length > 0
+            width:   claudeRow.implicitWidth + 20
+
+            RowLayout {
+                id: claudeRow
+                anchors.centerIn: parent
+                opacity: bar.claudeStale ? 0.5 : 1.0
+                StatItem {
+                    icon: "󰚩"
+                    value: bar.claudePercent("Session") + " · " + bar.claudePercent("Woche")
+                    iconColor: Theme.statIcon(Theme.clrPeach)
+                    textColor: bar.claudeColor
+                }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: bar.claudeToggled()
+                cursorShape: Qt.PointingHandCursor
             }
         }
 

@@ -11,6 +11,7 @@ ShellRoot {
     property bool sidePanelOpen:  false
     property bool statsOpen:      false
     property bool musicOpen:      false
+    property bool claudeOpen:     false
 
     // Hidden layers still commit, and every commit makes Hyprland present an
     // extra frame, which breaks VRR under a fullscreen game.
@@ -46,6 +47,7 @@ ShellRoot {
         onPanelToggled: root.sidePanelOpen = !root.sidePanelOpen
         onStatsToggled: root.statsOpen     = !root.statsOpen
         onMusicToggled: root.musicOpen     = !root.musicOpen
+        onClaudeToggled: root.claudeOpen   = !root.claudeOpen
     }
 
     Frame { visible: Theme.zen && !root.mainFullscreen }
@@ -94,6 +96,31 @@ ShellRoot {
         player:        mainBar.activePlayer
         trackPosition: mainBar.trackPosition
         trackLength:   mainBar.trackLength
+    }
+
+    ClaudeOverlay {
+        visible:     !root.mainFullscreen
+        claudeOpen:  root.claudeOpen
+        islandX:     mainBar.claudeIslandX
+        islandWidth: mainBar.claudeIslandWidth
+        limits:      mainBar.claudeLimits
+        tokens:      mainBar.claudeTokens
+        fetchedAt:   mainBar.claudeFetchedAt
+        stale:       mainBar.claudeStale
+    }
+
+    // Klick außerhalb schließt ClaudeOverlay
+    PanelWindow {
+        screen: mainBar.screen
+        anchors { top: true; left: true; right: true; bottom: true }
+        margins { top: Theme.overlayTop }
+        exclusiveZone: -1
+        color: "transparent"
+        visible: root.claudeOpen
+        MouseArea {
+            anchors.fill: parent
+            onClicked: root.claudeOpen = false
+        }
     }
 
     // Klick außerhalb schließt MusicOverlay
