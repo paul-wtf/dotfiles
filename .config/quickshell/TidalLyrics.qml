@@ -36,8 +36,14 @@ Singleton {
         return idx
     }
 
-    property real _syncedMs: 0
-    property real _syncedAt: 0
+    // Tidal's reported position runs ~6% fast and snaps back ~200 ms every few seconds.
+    // The clock follows wall time and eases toward the low end of those reports, never
+    // stepping backwards unless the gap is big enough to be a seek.
+    readonly property real resyncMs: 1500
+    property real _baseMs: 0
+    property real _baseAt: 0
+    property var  _errors: []
+    property real _offset: 0
     property string _fetchedFor: ""
 
     function isTidal(player) {
@@ -125,18 +131,42 @@ Singleton {
         _fetchedFor = ""
     }
 
+    function wallMs() {
+        return _baseMs + (playing ? Date.now() - _baseAt : 0)
+    }
+
+    function hardSync(reported) {
+        _baseMs = reported
+        _baseAt = Date.now()
+        _errors = []
+        _offset = 0
+        positionMs = reported
+    }
+
+    function tick() {
+        var target = _errors.length > 0 ? Math.min.apply(null, _errors) : 0
+        _offset += (target - _offset) * 0.1
+        positionMs = Math.max(positionMs, wallMs() + _offset)
+    }
+
     function poll() {
         request(api + "/player", null, function(status, p) {
             if (!p) { reset(); return }
-            playing = !!p.is_playing
-            _syncedMs = p.progress_ms || 0
-            _syncedAt = Date.now()
-            positionMs = _syncedMs
+            var reported = p.progress_ms || 0
             var id = p.item ? String(p.item.id) : ""
+            var nowPlaying = !!p.is_playing
+            var changed = id !== trackId || nowPlaying !== playing
             if (id !== trackId) {
                 trackId = id
                 lines = []
                 _fetchedFor = ""
+            }
+            playing = nowPlaying
+            var error = reported - wallMs()
+            if (changed || Math.abs(error) > resyncMs) {
+                hardSync(reported)
+            } else {
+                _errors = _errors.concat([error]).slice(-6)
             }
             if (id && _fetchedFor !== id) {
                 _fetchedFor = id
@@ -185,6 +215,6 @@ Singleton {
     Timer {
         interval: 50; repeat: true
         running: root.playing && root.synced
-        onTriggered: root.positionMs = root._syncedMs + (Date.now() - root._syncedAt)
+        onTriggered: root.tick()
     }
 }
