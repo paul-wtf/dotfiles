@@ -71,7 +71,7 @@ Singleton {
         var out = []
         for (var i = 0; i < words.length; i++)
             out.push(i === wordIndex
-                ? "<font color=\"" + accent + "\">" + escapeHtml(words[i]) + "</font>"
+                ? "<b><font color=\"" + accent + "\">" + escapeHtml(words[i]) + "</font></b>"
                 : escapeHtml(words[i]))
         return out.join(" ")
     }
