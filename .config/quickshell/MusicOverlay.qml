@@ -15,6 +15,8 @@ PanelWindow {
     property real trackLength:   0
 
     readonly property string nfFont: "JetBrainsMono Nerd Font"
+    readonly property bool showLyrics: TidalLyrics.synced && TidalLyrics.isTidal(player)
+    readonly property int  lyricsHeight: 120
 
     function fmt(s) {
         if (!s || s <= 0) return "0:00"
@@ -39,7 +41,7 @@ PanelWindow {
     // The click-outside catcher maps on open, so on the same layer it would
     // stack above this window and swallow clicks on the controls.
     WlrLayershell.layer: WlrLayer.Overlay
-    implicitHeight: musicOpen ? 175 : 4
+    implicitHeight: musicOpen ? (showLyrics ? 175 + lyricsHeight + 21 : 175) : 4
     Behavior on implicitHeight { NumberAnimation { duration: 280; easing.type: Easing.InOutCubic } }
 
     // Zen: Mantle-Fläche, die nahtlos aus der Bar wächst (Flares + Jelly)
@@ -249,6 +251,44 @@ PanelWindow {
                     text: overlay.fmt(overlay.trackLength)
                     color: Theme.clrSubtext0
                     font { family: overlay.nfFont; pixelSize: 11 }
+                }
+            }
+
+            // ── Lyrics ───────────────────────────────────────────────────────
+            Rectangle {
+                Layout.fillWidth: true; height: 1; color: Theme.clrSurface1; opacity: 0.45
+                visible: overlay.showLyrics
+            }
+
+            ListView {
+                id: lyricsList
+                Layout.fillWidth: true
+                Layout.preferredHeight: overlay.lyricsHeight
+                visible: overlay.showLyrics
+                clip: true
+                interactive: false
+                model: TidalLyrics.lines
+                currentIndex: TidalLyrics.currentIndex
+                highlightRangeMode: ListView.ApplyRange
+                preferredHighlightBegin: height / 2 - 10
+                preferredHighlightEnd:   height / 2 + 10
+                highlightMoveDuration: 350
+                spacing: 4
+
+                delegate: Text {
+                    required property var modelData
+                    required property int index
+                    width: lyricsList.width
+                    text: modelData.text.length > 0 ? modelData.text : "♪"
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    color: index === TidalLyrics.currentIndex ? Theme.clrText : Theme.clrSubtext0
+                    opacity: index === TidalLyrics.currentIndex ? 1.0 : 0.55
+                    font {
+                        family: overlay.nfFont; pixelSize: 12
+                        bold: index === TidalLyrics.currentIndex
+                    }
+                    Behavior on opacity { NumberAnimation { duration: 200 } }
                 }
             }
         }

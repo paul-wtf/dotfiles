@@ -835,12 +835,62 @@ PanelWindow {
             }
         }
 
+        // ── Lyrics island: current and next line of the Tidal track ──────────
+        Rectangle {
+            id: lyricsIsland
+            readonly property real room:
+                (musicIsland.visible ? musicIsland.x : rightIsland.x) - 16
+                - (centerIsland.x + centerIsland.width)
+            anchors {
+                right: musicIsland.visible ? musicIsland.left : rightIsland.left
+                rightMargin: 8; top: parent.top; topMargin: 2
+            }
+            height:  40
+            radius:  Theme.radius
+            color:   Theme.islandBg
+            border   { color: Theme.borderColor(0.55); width: Theme.islandBorderWidth }
+            visible: !bar.isLaptop && TidalLyrics.synced && TidalLyrics.isTidal(bar.activePlayer) && room >= 200
+            width:   Math.min(460, room)
+            clip:    true
+
+            Column {
+                anchors {
+                    left: parent.left; right: parent.right; leftMargin: 12; rightMargin: 12
+                    verticalCenter: parent.verticalCenter
+                }
+                spacing: 1
+
+                Text {
+                    width: parent.width
+                    text:  TidalLyrics.lineAt(TidalLyrics.currentIndex)
+                    color: Theme.clrText
+                    font   { family: "JetBrainsMono Nerd Font"; pixelSize: 12 }
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideRight
+                }
+                Text {
+                    width: parent.width
+                    text:  TidalLyrics.lineAt(TidalLyrics.currentIndex + 1)
+                    color: Qt.rgba(Theme.clrSubtext0.r, Theme.clrSubtext0.g, Theme.clrSubtext0.b, 0.6)
+                    font   { family: "JetBrainsMono Nerd Font"; pixelSize: 11 }
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideRight
+                }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: bar.musicToggled()
+                cursorShape: Qt.PointingHandCursor
+            }
+        }
+
         // ── Claude island: plan limits ───────────────────────────────────────
         Rectangle {
             id: claudeIsland
             anchors {
-                right: musicIsland.visible ? musicIsland.left : rightIsland.left
-                rightMargin: 8; top: parent.top; topMargin: 2
+                left: windowIsland.visible ? windowIsland.right : leftIsland.right
+                leftMargin: 8; top: parent.top; topMargin: 2
             }
             height:  40
             radius:  Theme.radius
