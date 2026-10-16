@@ -44,8 +44,11 @@ Singleton {
         return !!player && (player.identity ?? "").toLowerCase().includes("tidal")
     }
 
-    function isActive(syllable) {
-        return positionMs >= syllable.time && positionMs < syllable.end
+    // 0 = not sung yet, 0..1 = being sung, 1 = sung. Mirrors Radiant Lyrics' syllable wipe.
+    function progressOf(syllable) {
+        if (positionMs <= syllable.time) return 0
+        if (positionMs >= syllable.end) return 1
+        return (positionMs - syllable.time) / (syllable.end - syllable.time)
     }
 
     // Groups a line's syllables into words; a syllable ending in whitespace closes its word.
@@ -74,8 +77,8 @@ Singleton {
         var out = ""
         for (var i = 0; i < line.syllables.length; i++) {
             var s = line.syllables[i]
-            out += isActive(s)
-                ? "<b><font color=\"" + accent + "\">" + escapeHtml(s.text) + "</font></b>"
+            out += progressOf(s) > 0
+                ? "<font color=\"" + accent + "\">" + escapeHtml(s.text) + "</font>"
                 : escapeHtml(s.text)
         }
         return out
@@ -94,16 +97,8 @@ Singleton {
     function parseRl(body) {
         return body.data.map(function(l) {
             var syllables = (l.syllabus || []).map(s => ({
-                text: s.text, time: s.time, end: s.time + s.duration, bg: !!s.isBackground
+                text: s.text, time: s.time, end: s.time + Math.max(1, s.duration), bg: !!s.isBackground
             }))
-            // Close tiny gaps to the next syllable of the same voice so the highlight doesn't blink.
-            for (var i = 0; i < syllables.length; i++)
-                for (var j = i + 1; j < syllables.length; j++)
-                    if (syllables[j].bg === syllables[i].bg) {
-                        if (syllables[j].time - syllables[i].end < 250)
-                            syllables[i].end = Math.max(syllables[i].end, syllables[j].time)
-                        break
-                    }
             return { time: l.startTime * 1000, text: l.text, syllables: syllables }
         })
     }

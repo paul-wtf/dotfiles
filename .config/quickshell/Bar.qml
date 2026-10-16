@@ -5,7 +5,6 @@ import Quickshell.Services.Mpris
 import Quickshell.Widgets
 import Quickshell.Io
 import QtQuick
-import QtQuick.Effects
 import QtQuick.Layouts
 
 PanelWindow {
@@ -880,7 +879,7 @@ PanelWindow {
                     required property int index
                     readonly property int  offset:  index - TidalLyrics.currentIndex
                     readonly property bool current: offset === 0
-                    readonly property var  words:   current ? TidalLyrics.wordsOf(modelData) : []
+                    readonly property var  words:   offset === 0 || offset === -1 ? TidalLyrics.wordsOf(modelData) : []
                     readonly property bool wordView: words.length > 0 && wordRow.implicitWidth <= width
                     width:   barLyrics.width
                     height:  barLyrics.rowHeight
@@ -915,35 +914,49 @@ PanelWindow {
                             delegate: Row {
                                 id: wordItem
                                 required property var modelData
-                                readonly property bool hot: modelData.syllables.some(s => TidalLyrics.isActive(s))
-                                scale: hot ? 1.12 : 1.0
-                                Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack } }
 
                                 Repeater {
                                     model: wordItem.modelData.syllables
-                                    delegate: Text {
+                                    // Canvas, because a Text can't fill its glyphs with a gradient; this
+                                    // is the QML side of Radiant's background-clip: text wipe.
+                                    delegate: Canvas {
                                         id: syllable
                                         required property var modelData
-                                        readonly property bool active: TidalLyrics.isActive(modelData)
-                                        property real glow: active ? 1.0 : 0.0
-                                        text: modelData.text
-                                        color: active ? Theme.accent
-                                             : wordItem.modelData.bg ? Theme.clrSubtext0 : Theme.clrText
-                                        font {
-                                            family: "JetBrainsMono Nerd Font"; pixelSize: 12
-                                            bold: wordItem.hot; italic: wordItem.modelData.bg
+                                        readonly property real progress: TidalLyrics.progressOf(modelData)
+                                        readonly property real feather: 9
+                                        readonly property color sung: Theme.accent
+                                        readonly property color unsung: Qt.rgba(Theme.clrText.r, Theme.clrText.g, Theme.clrText.b,
+                                                                                wordItem.modelData.bg ? 0.25 : 0.4)
+                                        readonly property string fontSpec:
+                                            (wordItem.modelData.bg ? "italic " : "") + "12px \"JetBrainsMono Nerd Font\""
+                                        width:  metrics.advanceWidth
+                                        height: barLyrics.rowHeight
+                                        onProgressChanged: requestPaint()
+                                        onSungChanged:     requestPaint()
+                                        onWidthChanged:    requestPaint()
+
+                                        TextMetrics {
+                                            id: metrics
+                                            text: syllable.modelData.text
+                                            font { family: "JetBrainsMono Nerd Font"; pixelSize: 12; italic: wordItem.modelData.bg }
                                         }
-                                        Behavior on color { ColorAnimation  { duration: 120 } }
-                                        Behavior on glow  { NumberAnimation { duration: 200 } }
-                                        layer.enabled: glow > 0
-                                        layer.effect: MultiEffect {
-                                            shadowEnabled: true
-                                            shadowColor: Theme.accent
-                                            shadowOpacity: syllable.glow
-                                            shadowBlur: 0.7
-                                            blurMax: 10
-                                            shadowHorizontalOffset: 0
-                                            shadowVerticalOffset: 0
+
+                                        onPaint: {
+                                            var ctx = getContext("2d")
+                                            ctx.reset()
+                                            ctx.font = fontSpec
+                                            ctx.textBaseline = "middle"
+                                            var w = Math.max(1, width)
+                                            var edge = -feather / 2 + progress * (w + feather)
+                                            var from = Math.max(0, Math.min(1, (edge - feather / 2) / w))
+                                            var to   = Math.max(0, Math.min(1, (edge + feather / 2) / w))
+                                            var g = ctx.createLinearGradient(0, 0, w, 0)
+                                            g.addColorStop(0, progress > 0 ? sung : unsung)
+                                            g.addColorStop(from, progress > 0 ? sung : unsung)
+                                            g.addColorStop(to, progress >= 1 ? sung : unsung)
+                                            g.addColorStop(1, progress >= 1 ? sung : unsung)
+                                            ctx.fillStyle = g
+                                            ctx.fillText(modelData.text, 0, height / 2)
                                         }
                                     }
                                 }
