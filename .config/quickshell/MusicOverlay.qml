@@ -269,10 +269,12 @@ PanelWindow {
                 interactive: false
                 model: TidalLyrics.lines
                 currentIndex: TidalLyrics.currentIndex
+                highlight: Item {}
                 highlightRangeMode: ListView.ApplyRange
                 preferredHighlightBegin: height / 2 - 10
                 preferredHighlightEnd:   height / 2 + 10
                 highlightMoveDuration: 350
+                highlightMoveVelocity: -1
                 spacing: 4
 
                 delegate: Text {
