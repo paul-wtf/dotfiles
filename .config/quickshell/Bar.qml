@@ -5,6 +5,7 @@ import Quickshell.Services.Mpris
 import Quickshell.Widgets
 import Quickshell.Io
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 
 PanelWindow {
@@ -873,24 +874,70 @@ PanelWindow {
                 highlightMoveDuration: 380
                 highlightMoveVelocity: -1
 
-                delegate: Text {
+                delegate: Item {
+                    id: lyricRow
                     required property var modelData
                     required property int index
-                    readonly property int offset: index - TidalLyrics.currentIndex
-                    width: barLyrics.width
-                    height: barLyrics.rowHeight
-                    verticalAlignment: Text.AlignVCenter
-                    horizontalAlignment: Text.AlignHCenter
-                    elide: Text.ElideRight
-                    textFormat: Text.StyledText
-                    text: TidalLyrics.styledLine(modelData.text, index, Theme.accent)
-                    color: offset === 0 ? Theme.clrText : Theme.clrSubtext0
-                    opacity: offset === 0 ? 1.0 : offset === 1 ? 0.6 : 0.0
-                    scale: offset === 0 ? 1.0 : 0.9
-                    font { family: "JetBrainsMono Nerd Font"; pixelSize: 12 }
+                    readonly property int  offset:  index - TidalLyrics.currentIndex
+                    readonly property bool current: offset === 0
+                    readonly property var  words:   modelData.text.split(/\s+/).filter(w => w.length > 0)
+                    readonly property bool wordView: current && words.length > 0 && wordRow.implicitWidth <= width
+                    width:   barLyrics.width
+                    height:  barLyrics.rowHeight
+                    opacity: current ? 1.0 : offset === 1 ? 0.6 : 0.0
+                    scale:   current ? 1.0 : 0.9
                     Behavior on opacity { NumberAnimation { duration: 380; easing.type: Easing.InOutQuad } }
                     Behavior on scale   { NumberAnimation { duration: 380; easing.type: Easing.InOutQuad } }
-                    Behavior on color   { ColorAnimation  { duration: 380 } }
+
+                    Text {
+                        anchors.fill: parent
+                        visible: !lyricRow.wordView
+                        verticalAlignment: Text.AlignVCenter
+                        horizontalAlignment: Text.AlignHCenter
+                        elide: Text.ElideRight
+                        textFormat: Text.StyledText
+                        text: TidalLyrics.styledLine(lyricRow.modelData.text, lyricRow.index, Theme.accent)
+                        color: lyricRow.current ? Theme.clrText : Theme.clrSubtext0
+                        font { family: "JetBrainsMono Nerd Font"; pixelSize: 12 }
+                        Behavior on color { ColorAnimation { duration: 380 } }
+                    }
+
+                    TextMetrics { id: spaceMetrics; font { family: "JetBrainsMono Nerd Font"; pixelSize: 12 } text: " " }
+
+                    Row {
+                        id: wordRow
+                        anchors.centerIn: parent
+                        visible: lyricRow.wordView
+                        spacing: spaceMetrics.advanceWidth
+
+                        Repeater {
+                            model: lyricRow.current ? lyricRow.words : []
+                            delegate: Text {
+                                id: word
+                                required property string modelData
+                                required property int index
+                                readonly property bool active: index === TidalLyrics.wordIndex
+                                property real glow: active ? 1.0 : 0.0
+                                text: modelData
+                                color: active ? Theme.accent : Theme.clrText
+                                font { family: "JetBrainsMono Nerd Font"; pixelSize: 12; bold: active }
+                                scale: active ? 1.18 : 1.0
+                                Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack } }
+                                Behavior on color { ColorAnimation  { duration: 160 } }
+                                Behavior on glow  { NumberAnimation { duration: 220 } }
+                                layer.enabled: glow > 0
+                                layer.effect: MultiEffect {
+                                    shadowEnabled: true
+                                    shadowColor: Theme.accent
+                                    shadowOpacity: word.glow
+                                    shadowBlur: 0.7
+                                    blurMax: 10
+                                    shadowHorizontalOffset: 0
+                                    shadowVerticalOffset: 0
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
