@@ -3,11 +3,16 @@ import Quickshell
 import Quickshell.Services.Mpris
 import QtQuick
 
-// Synced lyrics of the current Tidal track, from the TidaLuna TidalAPI plugin.
+// Lyrics of the current Tidal track. Syllable timings come from the API behind the Radiant
+// Lyrics plugin; Tidal's own line-timed lyrics (via TidaLuna TidalAPI) are the fallback.
 Singleton {
     id: root
 
     readonly property string api: "http://127.0.0.1:24123"
+    readonly property string rlApi: "https://api.atomix.one/rl-api"
+    readonly property string rlFallback: "https://rl-api.kineticsand.net/lyrics"
+    // Published in plain text in meowarex/TidalLuna-Plugins (radiant-lyrics-luna/src/api.ts).
+    readonly property var rlHeaders: ({ "P-Access-Token-Id": "58hy4s86", "P-Access-Token": "xjehy2lfg5h5mjwotoxrcqugam" })
 
     readonly property bool tidalRunning: {
         var list = Mpris.players.values ?? Mpris.players
@@ -31,27 +36,6 @@ Singleton {
         return idx
     }
 
-    // Tidal only times whole lines: each word gets a share by length, at most msPerChar per
-    // character, so a pause before the next line doesn't stretch the last words.
-    readonly property real msPerChar: 75
-    readonly property var currentWords: currentIndex >= 0 ? lines[currentIndex].text.split(/\s+/).filter(w => w.length > 0) : []
-    readonly property int wordIndex: {
-        var words = currentWords
-        if (words.length === 0) return -1
-        var start = lines[currentIndex].time
-        var next = currentIndex + 1 < lines.length ? lines[currentIndex + 1].time : start + 5000
-        var total = 0
-        for (var i = 0; i < words.length; i++) total += words[i].length + 1
-        var perUnit = Math.min(next - start, total * msPerChar) / total
-        var elapsed = positionMs - start
-        var acc = 0
-        for (var j = 0; j < words.length; j++) {
-            acc += (words[j].length + 1) * perUnit
-            if (elapsed < acc) return j
-        }
-        return words.length - 1
-    }
-
     property real _syncedMs: 0
     property real _syncedAt: 0
     property string _fetchedFor: ""
@@ -60,20 +44,41 @@ Singleton {
         return !!player && (player.identity ?? "").toLowerCase().includes("tidal")
     }
 
+    function isActive(syllable) {
+        return positionMs >= syllable.time && positionMs < syllable.end
+    }
+
+    // Groups a line's syllables into words; a syllable ending in whitespace closes its word.
+    function wordsOf(line) {
+        var words = [], current = null
+        var syllables = line.syllables || []
+        for (var i = 0; i < syllables.length; i++) {
+            var s = syllables[i]
+            if (!current || current.bg !== s.bg) {
+                current = { bg: s.bg, syllables: [] }
+                words.push(current)
+            }
+            current.syllables.push({ text: s.text.trim(), time: s.time, end: s.end })
+            if (/\s$/.test(s.text)) current = null
+        }
+        return words.filter(w => w.syllables.some(s => s.text.length > 0))
+    }
+
     function escapeHtml(t) {
         return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     }
 
-    function styledLine(text, index, accent) {
-        if (text.length === 0) return "♪"
-        if (index !== currentIndex) return escapeHtml(text)
-        var words = currentWords
-        var out = []
-        for (var i = 0; i < words.length; i++)
-            out.push(i === wordIndex
-                ? "<b><font color=\"" + accent + "\">" + escapeHtml(words[i]) + "</font></b>"
-                : escapeHtml(words[i]))
-        return out.join(" ")
+    function styledLine(line, index, accent) {
+        if (line.text.length === 0) return "♪"
+        if (index !== currentIndex || !line.syllables || line.syllables.length === 0) return escapeHtml(line.text)
+        var out = ""
+        for (var i = 0; i < line.syllables.length; i++) {
+            var s = line.syllables[i]
+            out += isActive(s)
+                ? "<b><font color=\"" + accent + "\">" + escapeHtml(s.text) + "</font></b>"
+                : escapeHtml(s.text)
+        }
+        return out
     }
 
     function parseLrc(text) {
@@ -81,12 +86,29 @@ Singleton {
         var rows = (text || "").split("\n")
         for (var i = 0; i < rows.length; i++) {
             var m = /^\[(\d+):(\d+(?:\.\d+)?)\]\s?(.*)$/.exec(rows[i])
-            if (m) out.push({ time: (parseInt(m[1]) * 60 + parseFloat(m[2])) * 1000, text: m[3].trim() })
+            if (m) out.push({ time: (parseInt(m[1]) * 60 + parseFloat(m[2])) * 1000, text: m[3].trim(), syllables: [] })
         }
         return out
     }
 
-    function get(path, done) {
+    function parseRl(body) {
+        return body.data.map(function(l) {
+            var syllables = (l.syllabus || []).map(s => ({
+                text: s.text, time: s.time, end: s.time + s.duration, bg: !!s.isBackground
+            }))
+            // Close tiny gaps to the next syllable of the same voice so the highlight doesn't blink.
+            for (var i = 0; i < syllables.length; i++)
+                for (var j = i + 1; j < syllables.length; j++)
+                    if (syllables[j].bg === syllables[i].bg) {
+                        if (syllables[j].time - syllables[i].end < 250)
+                            syllables[i].end = Math.max(syllables[i].end, syllables[j].time)
+                        break
+                    }
+            return { time: l.startTime * 1000, text: l.text, syllables: syllables }
+        })
+    }
+
+    function request(url, headers, done) {
         var xhr = new XMLHttpRequest()
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== XMLHttpRequest.DONE) return
@@ -96,7 +118,8 @@ Singleton {
             }
             done(xhr.status, body)
         }
-        xhr.open("GET", api + path)
+        xhr.open("GET", url)
+        for (var h in headers || {}) xhr.setRequestHeader(h, headers[h])
         xhr.send()
     }
 
@@ -108,7 +131,7 @@ Singleton {
     }
 
     function poll() {
-        get("/player", function(status, p) {
+        request(api + "/player", null, function(status, p) {
             if (!p) { reset(); return }
             playing = !!p.is_playing
             _syncedMs = p.progress_ms || 0
@@ -120,18 +143,40 @@ Singleton {
                 lines = []
                 _fetchedFor = ""
             }
-            if (id && _fetchedFor !== id) fetchLyrics(id)
+            if (id && _fetchedFor !== id) {
+                _fetchedFor = id
+                fetchLyrics(id, p.item)
+            }
         })
     }
 
-    function fetchLyrics(id) {
-        get("/tracks/" + id + "/lyrics", function(status, l) {
-            if (id !== trackId) return
-            // 404 means the track has no lyrics; anything else but 200 is retried on the next poll.
-            if (status === 404) _fetchedFor = id
-            if (!l) return
-            _fetchedFor = id
-            lines = parseLrc(l.subtitles)
+    function fetchLyrics(id, item) {
+        var artist = item.artists && item.artists.length > 0 ? item.artists[0].name : ""
+        var q = "?title=" + encodeURIComponent(item.name || "") + "&artist=" + encodeURIComponent(artist)
+        if (item.isrc) q += "&isrc=" + encodeURIComponent(item.isrc)
+        q += "&platform=rl"
+
+        var useRl = function(body) {
+            if (id !== trackId) return true
+            if (!body || !Array.isArray(body.data) || (body.type !== "Word" && body.type !== "Line")) return false
+            var parsed = parseRl(body)
+            if (parsed.length === 0) return false
+            lines = parsed
+            return true
+        }
+        var useTidal = function() {
+            request(api + "/tracks/" + id + "/lyrics", null, function(status, l) {
+                if (id === trackId && l) lines = parseLrc(l.subtitles)
+            })
+        }
+
+        request(rlApi + q, rlHeaders, function(status, body) {
+            if (useRl(body)) return
+            // 404 from the primary means the service has no lyrics for this track at all.
+            if (status === 404) { useTidal(); return }
+            request(rlFallback + q, null, function(status2, body2) {
+                if (!useRl(body2)) useTidal()
+            })
         })
     }
 
@@ -143,7 +188,7 @@ Singleton {
     }
 
     Timer {
-        interval: 100; repeat: true
+        interval: 50; repeat: true
         running: root.playing && root.synced
         onTriggered: root.positionMs = root._syncedMs + (Date.now() - root._syncedAt)
     }
