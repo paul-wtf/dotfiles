@@ -880,8 +880,8 @@ PanelWindow {
                     required property int index
                     readonly property int  offset:  index - TidalLyrics.currentIndex
                     readonly property bool current: offset === 0
-                    readonly property var  words:   modelData.text.split(/\s+/).filter(w => w.length > 0)
-                    readonly property bool wordView: current && words.length > 0 && wordRow.implicitWidth <= width
+                    readonly property var  words:   current ? TidalLyrics.wordsOf(modelData) : []
+                    readonly property bool wordView: words.length > 0 && wordRow.implicitWidth <= width
                     width:   barLyrics.width
                     height:  barLyrics.rowHeight
                     opacity: current ? 1.0 : offset === 1 ? 0.6 : 0.0
@@ -896,7 +896,7 @@ PanelWindow {
                         horizontalAlignment: Text.AlignHCenter
                         elide: Text.ElideRight
                         textFormat: Text.StyledText
-                        text: TidalLyrics.styledLine(lyricRow.modelData.text, lyricRow.index, Theme.accent)
+                        text: TidalLyrics.styledLine(lyricRow.modelData, lyricRow.index, Theme.accent)
                         color: lyricRow.current ? Theme.clrText : Theme.clrSubtext0
                         font { family: "JetBrainsMono Nerd Font"; pixelSize: 12 }
                         Behavior on color { ColorAnimation { duration: 380 } }
@@ -911,29 +911,41 @@ PanelWindow {
                         spacing: spaceMetrics.advanceWidth
 
                         Repeater {
-                            model: lyricRow.current ? lyricRow.words : []
-                            delegate: Text {
-                                id: word
-                                required property string modelData
-                                required property int index
-                                readonly property bool active: index === TidalLyrics.wordIndex
-                                property real glow: active ? 1.0 : 0.0
-                                text: modelData
-                                color: active ? Theme.accent : Theme.clrText
-                                font { family: "JetBrainsMono Nerd Font"; pixelSize: 12; bold: active }
-                                scale: active ? 1.18 : 1.0
+                            model: lyricRow.words
+                            delegate: Row {
+                                id: wordItem
+                                required property var modelData
+                                readonly property bool hot: modelData.syllables.some(s => TidalLyrics.isActive(s))
+                                scale: hot ? 1.12 : 1.0
                                 Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutBack } }
-                                Behavior on color { ColorAnimation  { duration: 160 } }
-                                Behavior on glow  { NumberAnimation { duration: 220 } }
-                                layer.enabled: glow > 0
-                                layer.effect: MultiEffect {
-                                    shadowEnabled: true
-                                    shadowColor: Theme.accent
-                                    shadowOpacity: word.glow
-                                    shadowBlur: 0.7
-                                    blurMax: 10
-                                    shadowHorizontalOffset: 0
-                                    shadowVerticalOffset: 0
+
+                                Repeater {
+                                    model: wordItem.modelData.syllables
+                                    delegate: Text {
+                                        id: syllable
+                                        required property var modelData
+                                        readonly property bool active: TidalLyrics.isActive(modelData)
+                                        property real glow: active ? 1.0 : 0.0
+                                        text: modelData.text
+                                        color: active ? Theme.accent
+                                             : wordItem.modelData.bg ? Theme.clrSubtext0 : Theme.clrText
+                                        font {
+                                            family: "JetBrainsMono Nerd Font"; pixelSize: 12
+                                            bold: wordItem.hot; italic: wordItem.modelData.bg
+                                        }
+                                        Behavior on color { ColorAnimation  { duration: 120 } }
+                                        Behavior on glow  { NumberAnimation { duration: 200 } }
+                                        layer.enabled: glow > 0
+                                        layer.effect: MultiEffect {
+                                            shadowEnabled: true
+                                            shadowColor: Theme.accent
+                                            shadowOpacity: syllable.glow
+                                            shadowBlur: 0.7
+                                            blurMax: 10
+                                            shadowHorizontalOffset: 0
+                                            shadowVerticalOffset: 0
+                                        }
+                                    }
                                 }
                             }
                         }
