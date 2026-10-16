@@ -281,7 +281,8 @@ PanelWindow {
                     required property var modelData
                     required property int index
                     width: lyricsList.width
-                    text: modelData.text.length > 0 ? modelData.text : "♪"
+                    textFormat: Text.StyledText
+                    text: TidalLyrics.styledLine(modelData.text, index, Theme.accent)
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignHCenter
                     color: index === TidalLyrics.currentIndex ? Theme.clrText : Theme.clrSubtext0

@@ -882,7 +882,8 @@ PanelWindow {
                     verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
-                    text: modelData.text.length > 0 ? modelData.text : "♪"
+                    textFormat: Text.StyledText
+                    text: TidalLyrics.styledLine(modelData.text, index, Theme.accent)
                     color: offset === 0 ? Theme.clrText : Theme.clrSubtext0
                     opacity: offset === 0 ? 1.0 : offset === 1 ? 0.6 : 0.0
                     scale: offset === 0 ? 1.0 : 0.9

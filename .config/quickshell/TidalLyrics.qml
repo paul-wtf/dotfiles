@@ -31,12 +31,49 @@ Singleton {
         return idx
     }
 
+    // Tidal only times whole lines: each word gets a share by length, at most msPerChar per
+    // character, so a pause before the next line doesn't stretch the last words.
+    readonly property real msPerChar: 75
+    readonly property var currentWords: currentIndex >= 0 ? lines[currentIndex].text.split(/\s+/).filter(w => w.length > 0) : []
+    readonly property int wordIndex: {
+        var words = currentWords
+        if (words.length === 0) return -1
+        var start = lines[currentIndex].time
+        var next = currentIndex + 1 < lines.length ? lines[currentIndex + 1].time : start + 5000
+        var total = 0
+        for (var i = 0; i < words.length; i++) total += words[i].length + 1
+        var perUnit = Math.min(next - start, total * msPerChar) / total
+        var elapsed = positionMs - start
+        var acc = 0
+        for (var j = 0; j < words.length; j++) {
+            acc += (words[j].length + 1) * perUnit
+            if (elapsed < acc) return j
+        }
+        return words.length - 1
+    }
+
     property real _syncedMs: 0
     property real _syncedAt: 0
     property string _fetchedFor: ""
 
     function isTidal(player) {
         return !!player && (player.identity ?? "").toLowerCase().includes("tidal")
+    }
+
+    function escapeHtml(t) {
+        return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    }
+
+    function styledLine(text, index, accent) {
+        if (text.length === 0) return "♪"
+        if (index !== currentIndex) return escapeHtml(text)
+        var words = currentWords
+        var out = []
+        for (var i = 0; i < words.length; i++)
+            out.push(i === wordIndex
+                ? "<font color=\"" + accent + "\">" + escapeHtml(words[i]) + "</font>"
+                : escapeHtml(words[i]))
+        return out.join(" ")
     }
 
     function parseLrc(text) {
