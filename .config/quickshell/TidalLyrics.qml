@@ -39,11 +39,6 @@ Singleton {
         return !!player && (player.identity ?? "").toLowerCase().includes("tidal")
     }
 
-    function lineAt(i) {
-        if (i < 0 || i >= lines.length) return ""
-        return lines[i].text.length > 0 ? lines[i].text : "♪"
-    }
-
     function parseLrc(text) {
         var out = []
         var rows = (text || "").split("\n")

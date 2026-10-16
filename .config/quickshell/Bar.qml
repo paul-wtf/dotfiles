@@ -853,28 +853,43 @@ PanelWindow {
             width:   Math.min(460, room)
             clip:    true
 
-            Column {
+            ListView {
+                id: barLyrics
+                readonly property int rowHeight: 16
                 anchors {
                     left: parent.left; right: parent.right; leftMargin: 12; rightMargin: 12
                     verticalCenter: parent.verticalCenter
                 }
+                height: rowHeight * 2 + spacing
                 spacing: 1
+                clip: true
+                interactive: false
+                model: TidalLyrics.lines
+                currentIndex: TidalLyrics.currentIndex
+                highlight: Item {}
+                highlightRangeMode: ListView.StrictlyEnforceRange
+                preferredHighlightBegin: 0
+                preferredHighlightEnd: rowHeight
+                highlightMoveDuration: 380
+                highlightMoveVelocity: -1
 
-                Text {
-                    width: parent.width
-                    text:  TidalLyrics.lineAt(TidalLyrics.currentIndex)
-                    color: Theme.clrText
-                    font   { family: "JetBrainsMono Nerd Font"; pixelSize: 12 }
+                delegate: Text {
+                    required property var modelData
+                    required property int index
+                    readonly property int offset: index - TidalLyrics.currentIndex
+                    width: barLyrics.width
+                    height: barLyrics.rowHeight
+                    verticalAlignment: Text.AlignVCenter
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
-                }
-                Text {
-                    width: parent.width
-                    text:  TidalLyrics.lineAt(TidalLyrics.currentIndex + 1)
-                    color: Qt.rgba(Theme.clrSubtext0.r, Theme.clrSubtext0.g, Theme.clrSubtext0.b, 0.6)
-                    font   { family: "JetBrainsMono Nerd Font"; pixelSize: 11 }
-                    horizontalAlignment: Text.AlignHCenter
-                    elide: Text.ElideRight
+                    text: modelData.text.length > 0 ? modelData.text : "♪"
+                    color: offset === 0 ? Theme.clrText : Theme.clrSubtext0
+                    opacity: offset === 0 ? 1.0 : offset === 1 ? 0.6 : 0.0
+                    scale: offset === 0 ? 1.0 : 0.9
+                    font { family: "JetBrainsMono Nerd Font"; pixelSize: 12 }
+                    Behavior on opacity { NumberAnimation { duration: 380; easing.type: Easing.InOutQuad } }
+                    Behavior on scale   { NumberAnimation { duration: 380; easing.type: Easing.InOutQuad } }
+                    Behavior on color   { ColorAnimation  { duration: 380 } }
                 }
             }
 
